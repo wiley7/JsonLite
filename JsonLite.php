@@ -11,7 +11,11 @@
 
 class JsonLite
 {
+    // 严格的相等比较
     public $strictEqual = false;
+
+    // 严格的类型判断
+    public $strictType  = true;
 
     private $_dbFile = null;
 
@@ -34,7 +38,7 @@ class JsonLite
     /**
      * 查询
      */
-    public function find(array $query, array $options = array())
+    public function find(array $query, array $filter = array(), array $options = array())
     {
         $result = array();
         $handler = fopen($this->getDbFileName(), 'r');
@@ -45,7 +49,7 @@ class JsonLite
                 continue;
             }
             if ($this->_judgeData($data, $query)) {
-                $result[] = $data;
+                $result[] = $this->_filter($data, $filter);
             }
         } 
         fclose($handler);
@@ -129,6 +133,11 @@ class JsonLite
      */
     private function _doCompare($val, $cmp, $op)
     {
+        if ($this->strictType) {
+            if (gettype($val) != gettype($cmp)) {
+                return false;
+            }
+        }
         if ($op == '$gt') {
             return $val > $cmp;
         }
@@ -140,8 +149,26 @@ class JsonLite
     /**
      * 过滤字段
      */
-    private function _filter(array &$data, array &$filter)
+    private function _filter(array $data, array $filter)
     {
+        $ret = array();
+        // 先去除filter中设置为0的数据
+        foreach($filter as $k=>$v) {
+            if ($v == 0) {
+                unset($data[$k]);
+                unset($filter[$k]);
+            }
+        }
+        if (empty($filter)) {
+            return $data;
+        }
+        foreach($filter as $k=>$v) {
+            if (is_array($v)) {
+                $ret[$k] = $this->_filter($data[$k], $v);
+            }
+            $ret[$k] = $data[$k];
+        }
+        return $ret;
     }
 }
 
